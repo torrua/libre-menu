@@ -11,10 +11,7 @@ EXTENSION_TITLE = f"{EXTENSION_AUTHOR}'s features for LibreOffice"
 FOLDER_ICONS = "icons"
 
 DEFAULT_FONT = "Arial"
-SPECIAL_FONT = "Noto Sans"
-
 DEFAULT_FORMAT_WRITER_VALUE = "MS Word 2007 XML"
-DEFAULT_FORMAT_CALC_VALUE = "Calc MS Excel 2007 XML"
 
 DEFAULT_CHECKER_AUTHOR = "Pair Checker"
 CHECKER_PAIRS_TO_CHECK = [("«", "»",), ("„", "“",), ("‚", "‘",), ("(", ")",), ("[", "]",), ("{", "}",), ]
@@ -25,7 +22,6 @@ COLOR_DECIMAL_RED = 12582912
 COLOR_DECIMAL_BLUE = 28864
 
 COLOR_REVISION_TEXT_DISPLAY_DELETE = 16711680
-COLOR_REVISION_TEXT_DISPLAY_CHANGED_ATTRIBUTE = 2777241
 COLOR_REVISION_TEXT_DISPLAY_INSERT = 43315
 
 SYS_CHAR_ACCENT = 769
@@ -43,7 +39,6 @@ URL_WRITER_MODULE = "com.sun.star.text.TextDocument"
 ANNOTATION_UNIT = "com.sun.star.text.textfield.Annotation"
 DEFAULT_FONT_NODE_PATH = "/org.openoffice.Office.Writer/DefaultFont"
 DEFAULT_FORMAT_WRITER_NODE_PATH = "/org.openoffice.Setup/Office/Factories/org.openoffice.Setup:Factory['com.sun.star.text.TextDocument']"
-DEFAULT_FORMAT_CALC_NODE_PATH = "/org.openoffice.Setup/Office/Factories/org.openoffice.Setup:Factory['com.sun.star.sheet.SpreadsheetDocument']"
 
 MISC_NODE_PATH = "/org.openoffice.Office.Common/Misc"
 REVISION_TEXT_DISPLAY_NODE_PATH = "/org.openoffice.Office.Writer/Revision/TextDisplay/"
@@ -96,6 +91,7 @@ UI_ELEMENT_LABELS = {
         BTN_CONFIGURE:              "Configure",
     },
 }
+
 
 @dataclass
 class ButtonData:
