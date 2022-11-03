@@ -1,9 +1,6 @@
-
-import time
 from typing import Tuple, List
 
 from com.sun.star.awt import KeyEvent as KEY_EVENT
-from uno import createUnoStruct
 
 from core_constants import BTN_DOTTED_UNDERLINE, BTN_INSERT_ACCENT, \
     TOOLBAR_BUTTONS_NAMES
@@ -12,14 +9,16 @@ from core_constants import COLOR_REVISION_TEXT_DISPLAY_DELETE, COLOR_REVISION_TE
 from core_constants import DEFAULT_FONT_NODE_PATH, DEFAULT_FONT, DEFAULT_COLOR, \
     MISC_NODE_PATH, SYS_CHAR_ACCENT, CHECKER_PAIRS_TO_CHECK, CHECKER_ESCAPED_CHARACTERS
 from core_constants import DEFAULT_FORMAT_WRITER_NODE_PATH, DEFAULT_FORMAT_WRITER_VALUE
-from core_constants import Key, URL_RESET_ATTRIBUTES, \
-    ButtonData, DEFAULT_CHECKER_AUTHOR
+from core_constants import Key, URL_RESET_ATTRIBUTES, COLOR_DECIMAL_RED, \
+    ItemData, DEFAULT_CHECKER_AUTHOR
 from core_functions import NodeConfigurationManager as NCM
-from core_functions import add_menu_buttons, remove_menu_buttons, is_menu_buttons_on_toolbar
 from core_functions import get_current_document, call_dispatch, structify
 from core_functions import get_selection, app_version
 from core_functions import run_in_thread, get_ui_language
 from core_functions import set_key_for_command, insert_string
+from core_functions import disable_tracking, create_annotation, change_font_by_pattern
+from source.extension.src.pythonpath.core_constants import URL_WRITER_MODULE, TOOLBAR_BUTTONS_EXECUTIONS
+from source.extension.src.pythonpath.core_functions import get_ui_configuration_manager, ModuleConfigurationManager
 
 
 def dotted_underline():
@@ -28,43 +27,9 @@ def dotted_underline():
         selection.CharUnderline = 0 if selection.CharUnderline == 3 else 3
 
 
-def disable_tracking(func):
-    def wrapper():
-        doc = get_current_document()
-        is_changes_record = doc.RecordChanges
-        args_track_record = {"TrackChanges": False}
-        call_dispatch(doc, ".uno:TrackChanges", structify(args_track_record))
-        func()
-        args_track_record = {"TrackChanges": is_changes_record}
-        call_dispatch(doc, ".uno:TrackChanges", structify(args_track_record))
-    return wrapper
-
-
 @run_in_thread
 @disable_tracking
 def set_fonts():
-    to_default_font()
-    to_markup()
-
-
-@run_in_thread
-@disable_tracking
-def color_digits():
-    to_default_color()
-    to_color()
-
-
-def to_markup():
-    # TODO
-    ...
-
-
-def to_color():
-    # TODO
-    ...
-
-
-def to_default_font():
     selection = get_selection()
     if selection.getString():
         selection.setPropertyValue("CharFontName", DEFAULT_FONT)
@@ -75,6 +40,12 @@ def to_default_font():
     call_dispatch(doc, ".uno:SelectAll", ())
     call_dispatch(doc, ".uno:CharFontName", structify(args))
     doc.getCurrentController().getViewCursor().collapseToEnd()
+
+
+@run_in_thread
+@disable_tracking
+def color_digits():
+    change_font_by_pattern(r"\d+", {"CharColor": COLOR_DECIMAL_RED})
 
 
 def to_default_color():
@@ -90,37 +61,13 @@ def to_default_color():
     doc.getCurrentController().getViewCursor().collapseToEnd()
 
 
-def change_font_by_pattern(pattern: str, attrs: dict):
-    document = get_current_document()
-    text = document.Text
-    view_cursor = document.getCurrentController().getViewCursor()
-
-    start = text.createTextCursorByRange(view_cursor.Start)
-    end = None if view_cursor.isCollapsed() else text.createTextCursorByRange(view_cursor.End)
-
-    replace_descriptor = document.createReplaceDescriptor()
-    replace_descriptor.SearchRegularExpression = True
-    replace_descriptor.SearchString = pattern
-    replace_descriptor.ReplaceString = "&"
-    replace_descriptor.setReplaceAttributes(structify(attrs))
-
-    if end is None:
-        document.replaceAll(replace_descriptor)
-        return
-
-    find = document.findNext(start.End, replace_descriptor)
-    while find and text.compareRegionEnds(find, end) >= 0:
-        find.setPropertyValues(tuple(attrs.keys()), tuple(attrs.values()))
-        find = document.findNext(find.End, replace_descriptor)
-
-
 def insert_accent():
     insert_string(chr(SYS_CHAR_ACCENT))
 
 
 def switch_toolbar():
     def bar_button(name: str) -> Tuple:
-        button = ButtonData(name)
+        button = ItemData(name)
         return structify({
             'CommandURL': button.execute,
             'Label': button.label_text(get_ui_language().upper()),
@@ -128,33 +75,13 @@ def switch_toolbar():
             'IsVisible': True
         })
 
-    menu_buttons_to_add = reversed([bar_button(NAME) for NAME in TOOLBAR_BUTTONS_NAMES])
+    menu_buttons_to_add = list(reversed([bar_button(NAME) for NAME in TOOLBAR_BUTTONS_NAMES]))
     remove_menu_buttons() if is_menu_buttons_on_toolbar() else add_menu_buttons(menu_buttons_to_add)
 
 
 def check_pairs():
     delete_existing_comments()
     mark_wrong_pairs()
-
-
-def create_annotation(content: str = ""):
-    def get_current_time():
-        t = time.localtime()
-        dtv = createUnoStruct("com.sun.star.util.DateTime")
-        dtv.Year = t.tm_year
-        dtv.Month = t.tm_mon
-        dtv.Day = t.tm_mday
-        dtv.Hours = t.tm_hour
-        dtv.Minutes = t.tm_min
-        dtv.Seconds = t.tm_sec
-        dtv.NanoSeconds = 0
-        return dtv
-
-    anno = get_current_document().createInstance(ANNOTATION_UNIT)
-    anno.Content = content
-    anno.Author = DEFAULT_CHECKER_AUTHOR
-    anno.DateTimeValue = get_current_time()
-    return anno
 
 
 def delete_existing_comments() -> None:
@@ -254,8 +181,8 @@ def set_shortcut_keys():
 
     commands_list = [
         (ctrl_space, URL_RESET_ATTRIBUTES),
-        (alt_d, ButtonData(BTN_DOTTED_UNDERLINE).execute),
-        (alt_a, ButtonData(BTN_INSERT_ACCENT).execute), ]
+        (alt_d, ItemData(BTN_DOTTED_UNDERLINE).execute),
+        (alt_a, ItemData(BTN_INSERT_ACCENT).execute), ]
 
     _ = [set_key_for_command(*item) for item in commands_list]
 
@@ -304,3 +231,31 @@ def set_colors_of_changes_tracking() -> None:
 def disable_update_check() -> None:
     with NCM(JOBS_UPDATE_CHECK_NODE_PATH) as node:
         node.AutoCheckEnabled = False
+
+
+def is_menu_buttons_on_toolbar() -> bool:
+    standard_bar = "private:resource/toolbar/standardbar"
+    module_configuration_manager = get_ui_configuration_manager(URL_WRITER_MODULE)
+    toolbar_settings = module_configuration_manager.getSettings(standard_bar, True)
+    count = toolbar_settings.getCount()
+
+    for i in range(count):
+        for prop in toolbar_settings.getByIndex(i):
+            if prop.Name == "CommandURL" and prop.Value in TOOLBAR_BUTTONS_EXECUTIONS:
+                return True
+    return False
+
+
+def add_menu_buttons(buttons_to_add: List[Tuple]):
+    with ModuleConfigurationManager() as manager:
+        for button_setting in buttons_to_add:
+            manager.insert_by_index(button_setting)
+
+
+def remove_menu_buttons():
+    with ModuleConfigurationManager() as manager:
+        for i in reversed(range(manager.count)):
+            button_settings = manager.toolbar_settings.getByIndex(i)
+            for prop in button_settings:
+                if prop.Value in TOOLBAR_BUTTONS_EXECUTIONS:
+                    manager.remove_by_index(i)

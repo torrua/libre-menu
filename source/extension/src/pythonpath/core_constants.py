@@ -2,12 +2,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+
+EXT_RELEASE_MAJOR = 0
+EXT_RELEASE_MINOR = 0
+EXT_RELEASE_PATCH = 1
+EXT_RELEASE_BUILD = "%d%H%M%S"
+EXTENSION_VERSION = f"{EXT_RELEASE_MAJOR}.{EXT_RELEASE_MINOR}.{EXT_RELEASE_PATCH}.{datetime.now().strftime(EXT_RELEASE_BUILD)}"
 
 EXTENSION_NAME = "lomenu"
-EXTENSION_VERSION = "0.0.1"
 EXTENSION_AUTHOR = "torrua"
 EXTENSION_ID = f"org.{EXTENSION_AUTHOR}.extensions.{EXTENSION_NAME}"
 EXTENSION_TITLE = f"{EXTENSION_AUTHOR}'s features for LibreOffice"
+
 FOLDER_ICONS = "icons"
 
 DEFAULT_FONT = "Arial"
@@ -94,7 +101,7 @@ UI_ELEMENT_LABELS = {
 
 
 @dataclass
-class ButtonData:
+class ItemData:
     name: str
 
     @property
@@ -152,13 +159,13 @@ class ButtonData:
 
     @staticmethod
     def generate_images_nodes(button_names: list) -> str:
-        return "".join([ButtonData(name).image_node for name in button_names])
+        return "".join([ItemData(name).image_node for name in button_names])
 
     @staticmethod
     def generate_submenu_nodes(button_names: list) -> str:
-        return "".join([ButtonData(name).menu_node(index) for index, name in enumerate(button_names, 1)])
+        return "".join([ItemData(name).menu_node(index) for index, name in enumerate(button_names, 1)])
 
 
-BUTTONS_NAMES = list(UI_ELEMENT_LABELS.get(DEFAULT_UI_LANGUAGE).keys())
-TOOLBAR_BUTTONS_NAMES = [BTN for BTN in BUTTONS_NAMES if BTN not in (BTN_CONFIGURE, BTN_SWITCH_TOOLBAR)]
-TOOLBAR_BUTTONS_EXECUTIONS = [ButtonData(NAME).execute for NAME in TOOLBAR_BUTTONS_NAMES]
+ITEM_NAMES = list(UI_ELEMENT_LABELS.get(DEFAULT_UI_LANGUAGE).keys())
+TOOLBAR_BUTTONS_NAMES = [btn for btn in ITEM_NAMES if btn not in (BTN_CONFIGURE, BTN_SWITCH_TOOLBAR)]
+TOOLBAR_BUTTONS_EXECUTIONS = [ItemData(name).execute for name in TOOLBAR_BUTTONS_NAMES]

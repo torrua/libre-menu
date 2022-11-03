@@ -2,32 +2,19 @@
 """
 Core and Support LibreOffice functions
 """
-import inspect
 import threading
-from os import path
-from typing import List, Tuple, NamedTuple
+import time
+from typing import Tuple, NamedTuple
 from collections import namedtuple
 
 import uno
 from com.sun.star.awt import MessageBoxButtons
 
-from core_constants import URL_WRITER_MODULE, TOOLBAR_BUTTONS_EXECUTIONS
-
-
-def extension_folder() -> str:
-    package_folder = path.dirname(inspect.stack()[0][1])
-    return path.abspath(path.join(package_folder, "..\\"))
+from core_constants import URL_WRITER_MODULE
 
 
 def get_context():
     return uno.getComponentContext()
-
-
-def mri(target):
-    ctx = get_context()
-    mri = ctx.ServiceManager.createInstanceWithContext(
-        "mytools.Mri", ctx)
-    mri.inspect(target)
 
 
 def app_version() -> NamedTuple:
@@ -47,8 +34,8 @@ def app_version() -> NamedTuple:
 
 
 def get_service_manager():
-    context = get_context()
-    return context.getServiceManager()
+    cxt = get_context()
+    return cxt.getServiceManager()
 
 
 def get_desktop():
@@ -214,19 +201,6 @@ def get_ui_language():
     return configuration.ooLocale[0:2]
 
 
-def is_menu_buttons_on_toolbar() -> bool:
-    standard_bar = "private:resource/toolbar/standardbar"
-    module_configuration_manager = get_ui_configuration_manager(URL_WRITER_MODULE)
-    toolbar_settings = module_configuration_manager.getSettings(standard_bar, True)
-    count = toolbar_settings.getCount()
-
-    for i in range(count):
-        for prop in toolbar_settings.getByIndex(i):
-            if prop.Name == "CommandURL" and prop.Value in TOOLBAR_BUTTONS_EXECUTIONS:
-                return True
-    return False
-
-
 class NodeConfigurationManager:
     def __init__(self, node_path):
         self.node_path = node_path
@@ -270,24 +244,65 @@ class ModuleConfigurationManager:
         uno.invoke(self.toolbar_settings, "removeByIndex", (index, ))
 
 
-def add_menu_buttons(buttons_to_add: List[Tuple]):
-    with ModuleConfigurationManager() as manager:
-        for button_setting in buttons_to_add:
-            manager.insert_by_index(button_setting)
-
-
-def remove_menu_buttons():
-    with ModuleConfigurationManager() as manager:
-        for i in reversed(range(manager.count)):
-            button_settings = manager.toolbar_settings.getByIndex(i)
-            for prop in button_settings:
-                if prop.Value in TOOLBAR_BUTTONS_EXECUTIONS:
-                    manager.remove_by_index(i)
-
-
 def run_in_thread(fn):
     def run(*k, **kw):
         t = threading.Thread(target=fn, args=k, kwargs=kw)
         t.start()
         return t
     return run
+
+
+def disable_tracking(func):
+    def wrapper():
+        doc = get_current_document()
+        is_changes_record = doc.RecordChanges
+        args_track_record = {"TrackChanges": False}
+        call_dispatch(doc, ".uno:TrackChanges", structify(args_track_record))
+        func()
+        args_track_record = {"TrackChanges": is_changes_record}
+        call_dispatch(doc, ".uno:TrackChanges", structify(args_track_record))
+    return wrapper
+
+
+def change_font_by_pattern(pattern: str, attrs: dict):
+    document = get_current_document()
+    text = document.Text
+    view_cursor = document.getCurrentController().getViewCursor()
+
+    start = text.createTextCursorByRange(view_cursor.Start)
+    end = None if view_cursor.isCollapsed() else text.createTextCursorByRange(view_cursor.End)
+
+    replace_descriptor = document.createReplaceDescriptor()
+    replace_descriptor.SearchRegularExpression = True
+    replace_descriptor.SearchString = pattern
+    replace_descriptor.ReplaceString = "&"
+    replace_descriptor.setReplaceAttributes(structify(attrs))
+
+    if end is None:
+        document.replaceAll(replace_descriptor)
+        return
+
+    find = document.findNext(start.End, replace_descriptor)
+    while find and text.compareRegionEnds(find, end) >= 0:
+        find.setPropertyValues(tuple(attrs.keys()), tuple(attrs.values()))
+        find = document.findNext(find.End, replace_descriptor)
+
+
+def create_annotation(author: str = "author", content: str = ""):
+    def get_current_time():
+        t = time.localtime()
+        dtv = uno.createUnoStruct("com.sun.star.util.DateTime")
+        dtv.Year = t.tm_year
+        dtv.Month = t.tm_mon
+        dtv.Day = t.tm_mday
+        dtv.Hours = t.tm_hour
+        dtv.Minutes = t.tm_min
+        dtv.Seconds = t.tm_sec
+        dtv.NanoSeconds = 0
+        return dtv
+
+    anno = get_current_document().createInstance("com.sun.star.text.textfield.Annotation")
+    anno.Content = content
+    anno.Author = author
+    anno.DateTimeValue = get_current_time()
+    return anno
